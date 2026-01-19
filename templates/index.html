@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Simulador de Ciclos Termodinâmicos</title>
+</head>
+<body>
+
+    <header>
+        <h1>Simulador de Ciclos Termodinâmicos</h1>
+        <nav>
+            <button id="new-cycle-btn">Novo Ciclo</button>
+            <button id="about-btn">Sobre</button>
+        </nav>
+    </header>
+
+    <div class="main-layout">
+        <aside id="menu">
+            <h3 style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 1px;">Componentes</h3>
+            <button id="btnBomba">💧 Bomba</button>
+            <button id="btnCaldeira">🔥 Caldeira</button>
+            <button id="btnTurbina">⚙️ Turbina</button>
+            <button id="btnCondensador">🔄 Condensador</button>
+            <button id="btnReaquecedor">🔥 Reaquecedor</button>          
+            <button id="btnTrocaCalor">🔄 Trocador de calor</button>
+            <button id="btnCompressor">🌀 Compressor</button>
+        </aside>
+
+        <main class="content-area">
+            <div class="toolbar">
+                <div id="controls-group">
+                    <label for="workingFluid">Fluido:</label>
+                    <select id="workingFluid">
+                        <option value="Water" data-density="1000">Água (1000 kg/m³)</option>
+                        <option value="Air" data-density="1.225">Ar (1.225 kg/m³)</option>
+                        <option value="R245fa" data-density="1320">R245fa (1320 kg/m³)</option>
+                        <option value="R134a" data-density="1207">R134a (1207 kg/m³)</option>
+                        <option value="Ammonia" data-density="610">Amônia (610 kg/m³)</option>
+                        <option value="CO2" data-density="770">CO₂ (770 kg/m³)</option>
+                    </select>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="calculate-btn" class="toolbar-btn primary">🧮 Calcular</button>
+                    <button id="delete-btn" class="toolbar-btn danger" disabled>❌ Excluir</button>
+                    <button id="clear-btn" class="toolbar-btn secondary">🗑️ Limpar</button>
+                </div>
+            </div>
+
+            <div id="area">
+                <svg id="linhas" width="100%" height="100%"></svg>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE PROPRIEDADES -->
+    <div id="properties-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modal-title">Propriedades do Fluido na Conexão</h2>
+            <form id="properties-form">
+                <div class="form-group">
+                    <label for="modal-p">Pressão (kPa):</label>
+                    <input type="number" id="modal-p" step="any" placeholder="Ex: 101.325">
+                </div>
+                <div class="form-group">
+                    <label for="modal-t">Temperatura (°C):</label>
+                    <input type="number" id="modal-t" step="any" placeholder="Ex: 25">
+                </div>
+                <div class="form-group">
+                    <label for="modal-q">Título (0-1):</label>
+                    <input type="number" id="modal-q" step="any" min="0" max="1" placeholder="Ex: 0.5">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="save-btn">Salvar</button>
+                    <button type="button" class="cancel-btn">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
