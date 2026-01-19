@@ -4,6 +4,7 @@ import threading
 import webbrowser
 from relatorio_pdf import gerar_pdf_relatorio
 from regras_calculo import RegraCalculoBomba, RegraCalculoCompressor, RegraCalculoTurbina, RegraPropagacaoEntropia, RegraPropagacaoPressao, CalculadoraPropriedadesTermodinamicas
+from grafico_ts import gerar_grafico_ts
 
 class Circuito:
     def __init__(self, data, fluido="Water", densidade=1000.0):
@@ -63,12 +64,14 @@ class Circuito:
         return pifs_in, pifs_out
 
     def _calcular_eficiencia_ciclo(self):
-        w_turbina_total = sum(c.get("trabalho_turbina", 0) for c in self.components)
-        w_bomba_total = sum(c.get("trabalho_bomba", 0) for c in self.components)
-        w_compressor_total = sum(c.get("trabalho_compressor", 0) for c in self.components)
+        w_turbina_total = sum(float(c.get("trabalho_turbina", 0) or 0) for c in self.components)
+        w_bomba_total = sum(float(c.get("trabalho_bomba", 0) or 0) for c in self.components)
+        w_compressor_total = sum(float(c.get("trabalho_compressor", 0) or 0) for c in self.components)
         
-        # No ciclo Brayton, o calor é adicionado no trocador de calor pós-compressor
-        q_entrada_total = sum(c.get("trabalho_caldeira", 0) for c in self.components)
+        # Calor de entrada total = Calor da Caldeira + Calor do Reaquecedor
+        q_caldeira = sum(float(c.get("trabalho_caldeira", 0) or 0) for c in self.components)
+        q_reaquecedor = sum(float(c.get("trabalho_reaquecedor", 0) or 0) for c in self.components)
+        q_entrada_total = q_caldeira + q_reaquecedor
         
         eficiencia = None
         trabalho_liquido = w_turbina_total - (w_bomba_total + w_compressor_total)
@@ -80,7 +83,9 @@ class Circuito:
             "trabalho_turbina_total": round(w_turbina_total, 4),
             "trabalho_bomba_total": round(w_bomba_total, 4),
             "trabalho_compressor_total": round(w_compressor_total, 4),
-            "trabalho_caldeira_total": round(q_entrada_total, 4),
+            "trabalho_caldeira_total": round(q_caldeira, 4),
+            "trabalho_reaquecedor_total": round(q_reaquecedor, 4),
+            "calor_entrada_total": round(q_entrada_total, 4),
             "eficiencia_ciclo": round(eficiencia, 4) if eficiencia is not None else None
         }
 
@@ -97,11 +102,13 @@ class Circuito:
         for comp in self.components:
             entrada, saida = self.pifs_in.get(comp["id"], []), self.pifs_out.get(comp["id"], [])
             if len(entrada) == 1 and len(saida) == 1:
-                h_in, h_out = entrada[0].get("entalpia"), saida[0].get("entalpia")
+                h_in = entrada[0].get("entalpia")
+                h_out = saida[0].get("entalpia")
                 
                 # Se for Brayton, calculamos trabalho via Cp * deltaT
                 if self.tipo_ciclo == "Brayton":
-                    t_in, t_out = entrada[0].get("temperatura"), saida[0].get("temperatura")
+                    t_in = entrada[0].get("temperatura")
+                    t_out = saida[0].get("temperatura")
                     if t_in not in [None, "", "null"] and t_out not in [None, "", "null"]:
                         cp = 1.004 if self.fluido == "Air" else 1.005
                         t_in, t_out = float(t_in), float(t_out)
@@ -110,6 +117,8 @@ class Circuito:
                             # Apenas se vier após o compressor
                             if comp["id"] in pos_compressor:
                                 comp["trabalho_caldeira"] = round(cp * (t_out - t_in), 4)
+                        elif comp["type"] == "reaquecedor":
+                            comp["trabalho_reaquecedor"] = round(cp * (t_out - t_in), 4)
                         elif comp["type"] == "turbina": 
                             comp["trabalho_turbina"] = round(cp * (t_in - t_out), 4)
                         elif comp["type"] == "compressor": 
@@ -118,9 +127,14 @@ class Circuito:
 
                 if h_in not in [None, "", "null"] and h_out not in [None, "", "null"]:
                     h_in, h_out = float(h_in), float(h_out)
-                    if comp["type"] == "caldeira": comp["trabalho_caldeira"] = round(h_out - h_in, 4)
-                    elif comp["type"] == "turbina": comp["trabalho_turbina"] = round(h_in - h_out, 4)
-                    elif comp["type"] == "compressor": comp["trabalho_compressor"] = round(h_out - h_in, 4)
+                    if comp["type"] == "caldeira": 
+                        comp["trabalho_caldeira"] = round(h_out - h_in, 4)
+                    elif comp["type"] == "reaquecedor":
+                        comp["trabalho_reaquecedor"] = round(h_out - h_in, 4)
+                    elif comp["type"] == "turbina": 
+                        comp["trabalho_turbina"] = round(h_in - h_out, 4)
+                    elif comp["type"] == "compressor": 
+                        comp["trabalho_compressor"] = round(h_out - h_in, 4)
 
     def processar(self):
         # Passo 1: Propagação de Pressão (Herança nos trocadores)
@@ -168,4 +182,4 @@ def processar_circuito():
         return jsonify({"erro": "Falha ao gerar PDF.", "detalhes": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0',debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

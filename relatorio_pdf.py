@@ -1,90 +1,148 @@
 from fpdf import FPDF
 import io
 
-def gerar_pdf_relatorio(circuito_data):
-    tipo_ciclo = circuito_data.get("tipo_ciclo", "Rankine")
+def gerar_pdf_relatorio(data):
+    # Inicializa o PDF de forma simples para evitar erros de herança
     pdf = FPDF()
-    pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, f"Relatório de Cálculo do Ciclo {tipo_ciclo}", 0, 1, "C")
+    pdf.add_page()
+    
+    # Função auxiliar para formatar valores com segurança total
+    def fmt(val):
+        try:
+            if val is None or val == "" or val == "null":
+                return "0.0000"
+            return f"{float(val):.4f}"
+        except:
+            return "0.0000"
+
+    # --- CABEÇALHO ESTILIZADO ---
+    pdf.set_fill_color(31, 73, 125)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 15, 'RELATÓRIO DO CICLO TERMODINÂMICO', 0, 1, 'C', True)
     pdf.ln(5)
+
+    # --- SEÇÃO 1: INFORMAÇÕES GERAIS ---
+    pdf.set_fill_color(220, 230, 241)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, ' 1. INFORMAÇÕES GERAIS', 0, 1, 'L', True)
+    pdf.ln(2)
     
-    # 1. Resultados Globais
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "1. Resultados Globais do Ciclo", 0, 1, "L")
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(50, 8, 'Tipo de Ciclo:', 0, 0)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(0, 8, str(data.get('tipo_ciclo', 'N/A')), 0, 1)
     
-    resultados_ciclo = circuito_data.get("resultados_ciclo", {})
-    col_width = 50
-    line_height = 8
-    pdf.set_fill_color(200, 220, 255)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(col_width, line_height, "Métrica", 1, 0, "C", 1)
-    pdf.cell(col_width, line_height, "Valor", 1, 0, "C", 1)
-    pdf.cell(col_width, line_height, "Unidade", 1, 1, "C", 1)
-    
-    pdf.set_font("Arial", "", 10)
-    
-    metrics = [
-        ("Trabalho Total da Turbina", resultados_ciclo.get("trabalho_turbina_total"), "kJ/kg"),
-        ("Trabalho Total da Bomba", resultados_ciclo.get("trabalho_bomba_total"), "kJ/kg"),
-        ("Trabalho Total Compressor", resultados_ciclo.get("trabalho_compressor_total"), "kJ/kg"),
-        ("Calor Total da Caldeira", resultados_ciclo.get("trabalho_caldeira_total"), "kJ/kg"),
-        ("Eficiência do Ciclo", resultados_ciclo.get("eficiencia_ciclo"), "%")
-    ]
-    
-    for label, value, unit in metrics:
-        if value is not None and value != 0 or "Eficiência" in label:
-            pdf.cell(col_width, line_height, label, 1, 0, "L")
-            pdf.cell(col_width, line_height, f"{value:.4f}" if value is not None else "N/A", 1, 0, "R")
-            pdf.cell(col_width, line_height, unit, 1, 1, "C")
-        
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(50, 8, 'Fluido de Trabalho:', 0, 0)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(0, 8, str(data.get('fluido', 'Water')), 0, 1)
     pdf.ln(5)
+
+    # --- SEÇÃO 2: RESULTADOS DO CICLO ---
+    res = data.get("resultados_ciclo", {})
+    pdf.set_fill_color(220, 230, 241)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, ' 2. RESULTADOS DO CICLO', 0, 1, 'L', True)
+    pdf.ln(2)
     
-    # 2. PIFs
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "2. Propriedades nos Pontos de Fluxo (PIFs)", 0, 1, "L")
-    pifs = circuito_data.get("pifs", [])
-    col_widths_pif = [30, 25, 25, 25, 25, 25]
-    pdf.set_fill_color(220, 230, 255)
-    pdf.set_font("Arial", "B", 8)
-    headers = ["PIF", "Pressão (kPa)", "Temp. (°C)", "Entalpia (kJ/kg)", "Entropia (kJ/kg.K)", "Título (Q)"]
-    for i, h in enumerate(headers):
-        pdf.cell(col_widths_pif[i], 7, h, 1, 0 if i < len(headers)-1 else 1, "C", 1)
+    pdf.set_font('Arial', '', 10)
+    col_w = 95
+    pdf.cell(col_w, 8, f"Trabalho Turbina Total: {fmt(res.get('trabalho_turbina_total', 0))} kJ/kg", 0, 0)
+    pdf.cell(col_w, 8, f"Trabalho Bomba Total: {fmt(res.get('trabalho_bomba_total', 0))} kJ/kg", 0, 1)
     
-    pdf.set_font("Arial", "", 8)
-    for pif in pifs:
-        def f(v):
-            if v is None or v in ["", "null"]: return "N/A"
-            return f"{float(v):.4f}"
-        pdf.cell(col_widths_pif[0], 7, f"{pif.get('from')} -> {pif.get('to')}", 1, 0, "L")
-        pdf.cell(col_widths_pif[1], 7, f(pif.get("pressao")), 1, 0, "R")
-        pdf.cell(col_widths_pif[2], 7, f(pif.get("temperatura")), 1, 0, "R")
-        pdf.cell(col_widths_pif[3], 7, f(pif.get("entalpia")), 1, 0, "R")
-        pdf.cell(col_widths_pif[4], 7, f(pif.get("entropia")), 1, 0, "R")
-        pdf.cell(col_widths_pif[5], 7, f(pif.get("titulo")), 1, 1, "R")
+    pdf.cell(col_w, 8, f"Trabalho Compressor Total: {fmt(res.get('trabalho_compressor_total', 0))} kJ/kg", 0, 0)
+    pdf.cell(col_w, 8, f"Calor Caldeira Total: {fmt(res.get('trabalho_caldeira_total', 0))} kJ/kg", 0, 1)
+    
+    q_reaq = float(res.get('trabalho_reaquecedor_total', 0) or 0)
+    if q_reaq > 0:
+        pdf.set_text_color(0, 102, 204)
+        pdf.cell(col_w, 8, f"Calor Reaquecedor Total: {fmt(q_reaq)} kJ/kg", 0, 0)
+        pdf.cell(col_w, 8, f"Calor Entrada Total: {fmt(res.get('calor_entrada_total', 0))} kJ/kg", 0, 1)
+        pdf.set_text_color(0, 0, 0)
+    
+    pdf.ln(2)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.set_fill_color(255, 255, 153)
+    pdf.cell(0, 10, f" EFICIÊNCIA TÉRMICA DO CICLO: {res.get('eficiencia_ciclo', 'N/A')}%", 0, 1, 'L', True)
+    pdf.ln(8)
+
+    # --- SEÇÃO 3: DETALHES POR COMPONENTE ---
+    pdf.set_fill_color(220, 230, 241)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, ' 3. DETALHES POR COMPONENTE', 0, 1, 'L', True)
+    pdf.ln(2)
+
+    for comp in data.get("components", []):
+        pdf.set_font('Arial', 'B', 10)
+        pdf.set_text_color(31, 73, 125)
+        pdf.cell(0, 7, f" - {str(comp.get('id', 'N/A'))} [{str(comp.get('type', 'N/A')).upper()}]", 0, 1)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('Arial', '', 9)
         
+        c_type = comp.get("type")
+        label, val = "", 0
+        if c_type == "turbina": label, val = "Trabalho Produzido:", comp.get('trabalho_turbina', 0)
+        elif c_type == "bomba": label, val = "Trabalho Consumido:", comp.get('trabalho_bomba', 0)
+        elif c_type == "compressor": label, val = "Trabalho Consumido:", comp.get('trabalho_compressor', 0)
+        elif c_type == "caldeira": label, val = "Calor Adicionado:", comp.get('trabalho_caldeira', 0)
+        elif c_type == "reaquecedor": label, val = "Calor de Reaquecimento:", comp.get('trabalho_reaquecedor', 0)
+        
+        if label:
+            pdf.cell(10)
+            pdf.cell(50, 6, label, 0, 0)
+            pdf.set_font('Arial', 'B', 9)
+            pdf.cell(0, 6, f"{fmt(val)} kJ/kg", 0, 1)
+        pdf.ln(1)
+
+    # --- SEÇÃO 4: TABELA DE PROPRIEDADES ---
     pdf.ln(5)
+    pdf.set_fill_color(220, 230, 241)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, ' 4. PROPRIEDADES NOS PONTOS (PIFs)', 0, 1, 'L', True)
+    pdf.ln(2)
     
-    # 3. Componentes
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "3. Trabalhos e Calores dos Componentes", 0, 1, "L")
-    componentes = circuito_data.get("components", [])
-    col_widths_comp = [40, 30, 30, 30, 30]
-    pdf.set_fill_color(255, 230, 220)
-    pdf.set_font("Arial", "B", 9)
-    headers_comp = ["ID", "Tipo", "Trab. Bomba", "Trab. Turbina", "Calor Caldeira"]
-    for i, h in enumerate(headers_comp):
-        pdf.cell(col_widths_comp[i], 7, h, 1, 0 if i < len(headers_comp)-1 else 1, "C", 1)
+    pdf.set_fill_color(31, 73, 125)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 8)
     
-    pdf.set_font("Arial", "", 9)
-    for comp in componentes:
-        def f(v): return f"{float(v):.4f}" if v is not None else "N/A"
-        pdf.cell(col_widths_comp[0], 7, comp.get("id"), 1, 0, "L")
-        pdf.cell(col_widths_comp[1], 7, comp.get("type"), 1, 0, "C")
-        pdf.cell(col_widths_comp[2], 7, f(comp.get("trabalho_bomba") or comp.get("trabalho_compressor")), 1, 0, "R")
-        pdf.cell(col_widths_comp[3], 7, f(comp.get("trabalho_turbina")), 1, 0, "R")
-        pdf.cell(col_widths_comp[4], 7, f(comp.get("trabalho_caldeira")), 1, 1, "R")
+    h = 8
+    pdf.cell(15, h, "ID", 1, 0, 'C', True)
+    pdf.cell(30, h, "Pressão (kPa)", 1, 0, 'C', True)
+    pdf.cell(30, h, "Temp. (C)", 1, 0, 'C', True)
+    pdf.cell(40, h, "Entalpia (kJ/kg)", 1, 0, 'C', True)
+    pdf.cell(40, h, "Entropia (kJ/kg.K)", 1, 0, 'C', True)
+    pdf.cell(35, h, "Título", 1, 1, 'C', True)
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', '', 8)
+    fill = False
+    for p in data.get("pifs", []):
+        if fill: pdf.set_fill_color(240, 240, 240)
+        else: pdf.set_fill_color(255, 255, 255)
         
-    return io.BytesIO(pdf.output(dest='S'))
+        pdf.cell(15, 7, str(p.get("id", "")), 1, 0, 'C', fill)
+        pdf.cell(30, 7, str(p.get("pressao", "")), 1, 0, 'C', fill)
+        pdf.cell(30, 7, str(p.get("temperatura", "")), 1, 0, 'C', fill)
+        pdf.cell(40, 7, str(p.get("entalpia", "")), 1, 0, 'C', fill)
+        pdf.cell(40, 7, str(p.get("entropia", "")), 1, 0, 'C', fill)
+        pdf.cell(35, 7, str(p.get("titulo", "")), 1, 1, 'C', fill)
+        fill = not fill
+
+    # Geração do buffer de forma compatível com múltiplas versões do FPDF
+    buffer = io.BytesIO()
+    try:
+        # Tenta obter como bytes diretamente (FPDF2)
+        output = pdf.output(dest='S')
+        if isinstance(output, str):
+            output = output.encode('latin-1')
+        buffer.write(output)
+    except:
+        # Fallback para métodos alternativos
+        pdf_str = pdf.output(dest='S')
+        buffer.write(pdf_str.encode('latin-1'))
+        
+    buffer.seek(0)
+    return buffer
